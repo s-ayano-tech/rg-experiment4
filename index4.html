@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>実験ゲーム</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <script src="https://unpkg.com/jspsych@7.3.4"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@1.0.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
+    
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <style>
+      body { 
+        background-color: #f0f0f0;
+        color: #333; font-family: "Helvetica Neue", Arial, sans-serif;
+        margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; 
+        touch-action: manipulation;
+        user-select: none; -webkit-user-select: none;
+      }
+      #jspsych-target {
+        width: 100%;
+        height: 100%; display: flex; flex-direction: column;
+        justify-content: center; align-items: center; outline: none; overflow-y: auto;
+      }
+      .game-wrapper {
+        width: 100%; height: 100%;
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center; overflow: hidden; padding-top: 10vh;
+      }
+      .cue-wrapper {
+        width: 100%; height: 100%;
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center; padding-bottom: 5vh;
+      }
+      
+      .character-box { position: relative; text-align: center;
+      }
+      .character-box img { 
+        width: 25vw;
+        height: auto; 
+        max-width: 150px; 
+        max-height: 30vh; 
+        object-fit: contain; 
+      }
+      .cue-wrapper .character-box img { 
+        width: 25vw;
+        max-width: 150px; 
+      }
+      .cue-wrapper .speech-bubble { 
+        bottom: 105%;
+        width: max-content; 
+        max-width: 80vw;
+        font-size: clamp(22px, 5vw, 28px); 
+      }
+
+      /* 折り返しを防いで必ず左右に並べるために nowrap を追加 */
+      .mini-scene {
+        display: flex;
+        justify-content: center; align-items: flex-end; gap: 10vw; 
+        width: 100%; margin-top:6vh; margin-bottom: 2vh;
+        flex-wrap: nowrap;
+      }
+      .mini-scene .character-box img {
+        width: 15vw;
+        max-width: 90px; max-height: 15vh;
+      }
+      .mini-scene .speech-bubble {
+        font-size: clamp(20px, 5vw, 24px);
+        padding: 6px 10px; 
+        width: max-content; 
+        max-width: 38vw; 
+        min-height: 60px; 
+        display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+        bottom: 102%;
+      }
+      
+      #score-board {
+        position: fixed;
+        bottom: 15px; left: 50%; transform: translateX(-50%); 
+        font-size: 20px; font-weight: bold; background-color: #fff; padding: 6px 14px; 
+        border: 2px solid #333;
+        border-radius: 10px; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        display: none; white-space: nowrap; pointer-events: none;
+      }
+
+      #trial-counter {
+        position: fixed; bottom: 15px;
+        right: 15px; 
+        font-size: 18px; font-weight: bold; background-color: #fff; padding: 6px 12px; 
+        border: 2px solid #333; border-radius: 8px; z-index: 1000;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        display: none; pointer-events: none;
+      }
+      
+      /* 折り返しを防いで必ず左右に並べるために nowrap を追加 */
+      .scene-container { display: flex;
+        justify-content: center; align-items: flex-end; gap: 15px; margin-bottom: 2vh; width: 100%;
+        flex-wrap: nowrap;
+      }
+      .scene-wide-gap { gap: 50px !important;
+      }
+      
+      .speech-bubble {
+        position: absolute;
+        bottom: 102%; left: 50%; transform: translateX(-50%);
+        background: #fff; border: 3px solid #333; border-radius: 12px; 
+        padding: 10px; 
+        width: max-content; 
+        max-width: 60vw;
+        min-height: 80px;
+        display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+        font-weight: bold; font-size: clamp(22px, 5vw, 28px); 
+        line-height: 1.5;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1); z-index: 10; pointer-events: none; white-space: pre-wrap;
+      }
+      .speech-bubble::after {
+        content: ''; position: absolute;
+        top: 100%; left: 50%; margin-left: -8px;
+        border-width: 8px; border-style: solid; border-color: #333 transparent transparent transparent;
+      }
+
+      .chest-container { display: flex; justify-content: center; gap: 10px; width: 100%; margin-top: 1vh;
+      }
+      .chest-btn { 
+        width: 25vw; max-width: 150px;
+        aspect-ratio: 1/1.2; background: none; border: none; 
+        cursor: pointer; padding: 0; position: relative; display: flex; align-items: flex-end;
+      }
+      .chest-btn:active { transform: scale(0.95); }
+      .chest-img { width: 100%;
+        height: 100%; object-fit: contain; pointer-events: none; }
+
+      @keyframes floatUp { 0% { opacity: 1;
+        transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -60px) scale(1.2);
+      } }
+      .point-feedback {
+        position: absolute; top: 15%;
+        left: 50%; transform: translateX(-50%); 
+        font-size: 8vw; font-weight: bold; color: #777777;
+        text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+        pointer-events: none;
+        z-index: 2000; animation: floatUp 1.5s ease-out forwards;
+      }
+
+      #cod-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.95);
+        display: flex; align-items: center; justify-content: center;
+        flex-direction: column;
+        z-index: 2000; 
+        font-size: clamp(22px, 5vw, 28px); font-weight: bold; color: #e74c3c; visibility: hidden;
+      }
+
+      .spinner {
+        border: 6px solid rgba(0, 0, 0, 0.1);
+        border-left-color: #e74c3c;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 15px;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg);
+      } }
+      .cod-inner { display: flex; flex-direction: column; align-items: center; justify-content: center;
+      }
+      
+      .instruction-wrap { 
+        text-align: left;
+        width: 85%; max-width: 600px; margin: 20px auto; 
+        line-height: 1.5; font-size: 16px; padding: 20px; background: white; 
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      }
+      .form-group { margin-bottom: 15px;
+      }
+      select, input[type="radio"] { font-size: 16px; padding: 5px;
+      }
+      
+      .radio-group {
+        display: flex;
+        justify-content: space-between; width: 100%; margin-top: 5px;
+      }
+      .radio-group label {
+        display: flex;
+        flex-direction: column; align-items: center; font-size: 14px;
+      }
+
+      @media (min-width: 768px) {
+        .scene-wide-gap { gap: 150px !important;
+        } 
+        .chest-container { gap: 60px;
+        }
+        .chest-btn { width: 180px; max-width: none;
+        } 
+        .character-box img { max-width: 180px;
+        } 
+        .cue-wrapper .character-box img { max-width: 180px;
+        }
+        .point-feedback { font-size: 40px; top: 5%;
+        } 
+        #score-board { font-size: 28px; bottom: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="score-board"><span id="points-label">獲得枚数:</span> <span id="points">0枚</span></div>
+    <div id="trial-counter">1/20</div>
+    <div id="cod-overlay"></div>
+    <div id="jspsych-target"></div>
+  </body>
+  <script>
+    const IMG_BLUE_SRC = 'img/blue_guy.png';
+    const IMG_RED_SRC = 'img/red_guy.png'; 
+    const IMG_CHEST_CLOSED = 'img/chest.png';
+    const IMG_CHEST_OPEN = 'img/chestopn.png';
+
+    function getImgHtml(src) { return `<img src="${src}" class="avatar-img" onerror="this.style.display='none';">`;
+    }
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playAudio(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        if (type === 'click') playSynthesizedTone(350, 0.04, 'triangle'); 
+        else if (type === 'switch') playSynthesizedTone(180, 0.12, 'sawtooth');
+        else if (type === 'loss_small') playSmallLossTone();   
+        else if (type === 'loss_large') playLargeLossTone();   
+        else if (type === 'reward_small') playCoinTone();
+        else if (type === 'reward_large') playJackpotTone();
+    }
+    function playSynthesizedTone(frequency, duration, waveType = 'sine') {
+        try { var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain(); osc.type = waveType; osc.connect(gain); gain.connect(audioCtx.destination); osc.frequency.value = frequency; gain.gain.setValueAtTime(0.08, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration); osc.start();
+        osc.stop(audioCtx.currentTime + duration); } catch(e) {}
+    }
+    function playCoinTone() {
+        try { var now = audioCtx.currentTime;
+        var osc = audioCtx.createOscillator(); var gain = audioCtx.createGain(); osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination); osc.frequency.setValueAtTime(587.33, now); osc.frequency.setValueAtTime(880.00, now + 0.06);
+        gain.gain.setValueAtTime(0.08, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25); osc.start(now); osc.stop(now + 0.25);
+        } catch(e) {}
+    }
+    function playJackpotTone() {
+        try { var now = audioCtx.currentTime;
+        var notes = [523.25, 659.25, 783.99, 1046.50]; notes.forEach((freq, index) => { var osc = audioCtx.createOscillator(); var gain = audioCtx.createGain(); osc.type = 'triangle'; osc.connect(gain); gain.connect(audioCtx.destination); var noteStart = now + (index * 0.05); osc.frequency.setValueAtTime(freq, noteStart); gain.gain.setValueAtTime(0.06, noteStart); gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.15); osc.start(noteStart); osc.stop(noteStart + 0.15); });
+        } catch(e) {}
+    }
+    
+    function playSmallLossTone() {
+        try { 
+            var now = audioCtx.currentTime;
+            var osc = audioCtx.createOscillator(); 
+            var gain = audioCtx.createGain(); 
+            osc.type = 'triangle';
+            osc.connect(gain); 
+            gain.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(600, now); 
+            osc.frequency.exponentialRampToValueAtTime(300, now + 0.2);
+            gain.gain.setValueAtTime(0.08, now); 
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2); 
+            osc.start(now); 
+            osc.stop(now + 0.2);
+        } catch(e) {}
+    }
+    
+    function playLargeLossTone() {
+        try { var now = audioCtx.currentTime;
+        var notes = [261.63, 233.08, 207.65, 174.61]; notes.forEach((freq, index) => { var osc = audioCtx.createOscillator(); var gain = audioCtx.createGain(); osc.type = 'sawtooth'; osc.connect(gain); gain.connect(audioCtx.destination); var noteStart = now + (index * 0.15); var duration = (index === notes.length - 1) ? 0.4 : 0.15; osc.frequency.setValueAtTime(freq, noteStart); if(index === notes.length - 1) { osc.frequency.exponentialRampToValueAtTime(100, noteStart + duration); } gain.gain.setValueAtTime(0.08, noteStart); gain.gain.exponentialRampToValueAtTime(0.001, noteStart + duration); osc.start(noteStart); osc.stop(noteStart + duration); });
+        } catch(e) {}
+    }
+
+    function showFloatingPoints(amount, side, chestId) {
+        var el = document.createElement('div');
+        el.className = 'point-feedback';
+        
+        if (parseInt(amount) === 20) {
+            el.style.color = '#ff0000'; // 大当たりは赤
+        } else if (parseInt(amount) === 0) {
+            el.style.color = '#777777'; // 0枚はグレー（目立たなくする）
+        }
+        
+        el.innerHTML = '+' + amount + '枚'; 
+        
+        document.getElementById(chestId).appendChild(el);
+        
+        setTimeout(() => { if(el && el.parentNode) el.parentNode.removeChild(el); }, 2000);
+    }
+
+    function getFHIntervals(N, VI) {
+        var intervals = [];
+        for (var n = 1; n <= N; n++) {
+            var term1 = 1 + Math.log(N);
+            var term2 = (N - n) === 0 ? 0 : (N - n) * Math.log(N - n);
+            var term3 = (N - n + 1) * Math.log(N - n + 1);
+            intervals.push(VI * (term1 + term2 - term3));
+        }
+        return intervals;
+    }
+
+    var total_money = 0; 
+    var total_money_test = 0;
+    var initial_money = 2000; 
+    var experiment_data = {};
+    var block_start_time = 0;
+    var last_side = null;
+    var current_phase = 'training'; 
+    var experiment_start_time = Date.now();
+    var summary_data = {
+        total_clicks_training: 0,
+        follow_accurate_training: 0,
+        follow_inaccurate_training: 0,
+        unfollow_accurate_training: 0,
+        unfollow_inaccurate_training: 0, 
+        total_success_training: 0,
+        total_clicks_test: 0,
+        points_lost_follow_accurate_training: 0,
+        points_lost_follow_inaccurate_training: 0,
+        points_lost_unfollow_accurate_training: 0,
+        points_lost_unfollow_inaccurate_training: 0,
+        follow_red_test: 0,
+        follow_blue_test: 0,
+        unfollow_red_test: 0,
+        unfollow_blue_test: 0,
+        // Case A, Case B 用の詳細集計
+        caseA_total_clicks: 0,
+        caseA_follow_accurate_clicks: 0,
+        caseA_unfollow_accurate_clicks: 0,
+        caseA_follow_inaccurate_clicks: 0,
+        caseA_unfollow_inaccurate_clicks: 0,
+        
+        caseB_total_clicks: 0,
+        caseB_follow_accurate_clicks: 0,
+        caseB_unfollow_accurate_clicks: 0,
+        caseB_follow_inaccurate_clicks: 0,
+        caseB_unfollow_inaccurate_clicks: 0
+    };
+    var time_data = {
+        training_start: 0,
+        training_end: 0,
+        test_start: 0,
+        test_end: 0
+    };
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+    
+    function hasConsecutiveValue(arr, value) {
+        for (let i = 0; i < arr.length - 1; i++) {
+            if (arr[i] === value && arr[i + 1] === value) return true;
+        }
+        return false;
+    }
+
+    function createEmotionForm(prefix) {
+        let html = `<div class="instruction-wrap" style="text-align:center;">
+            <h3 style="margin-top:0;">いまの気持ちを尋ねます。当てはまるものを選択してください。</h3>
+            <p style="font-size:14px;">（1: 全く感じない 〜 9: 極めて強く感じる）</p>`;
+        const emotions = [
+            { id: 'happy', label: '幸せだ' },
+            { id: 'relax', label: 'リラックスしている' },
+            { id: 'disappoint', label: 'がっかりしている' },
+            { id: 'tension', label: '緊張している' }
+        ];
+        emotions.forEach(emo => {
+            html += `
+            <div style="margin:20px 0; text-align:left; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                <p style="margin:0 0 10px 0; font-weight:bold;">${emo.label}</p>
+                <div class="radio-group">`;
+            for(let i=1; i<=9; i++) {
+                 html += `<label><input type="radio" name="${prefix}_${emo.id}" value="${i}" required> ${i}</label>`;
+            }
+            html += `</div></div>`;
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    var current_vi_intervals = [];
+    var next_reward_time = 0;
+    var jsPsych = initJsPsych({
+      display_element: 'jspsych-target'
+    });
+    
+    var timeline = [];
+    timeline.push({
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `<div class="instruction-wrap">
+            <p>これから宝箱を選択するゲームに挑戦してもらいます。所要時間は40~50分ほどです。</p>
+            <p>実験はいつでも中断・中止することができます。中断・中止する場合は実験者にお知らせください。</p>
+            <p>実験参加に同意する場合は同意するを押してください。同意しない場合はブラウザを閉じて実験を終了してください。</p>
+        </div>`,
+        choices: ['同意する']
+    });
+    timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        html: `
+            <div class="instruction-wrap">
+                <h3>基本情報の入力</h3>
+                <div class="form-group"><label>年齢</label>
+                    <select name="age" required><option value="" disabled selected>選択してください</option>
+                    <option value="10s">10代</option><option value="20s">20代</option><option value="30s">30代</option>
+                    <option value="40s">40代</option><option value="50s">50代</option><option value="60s">60代</option><option value="70s">70代以上</option></select>
+                </div>
+                <div class="form-group"><label>性別</label>
+                    <select name="gender" required><option value="" disabled selected>選択してください</option>
+                    <option value="male">男性</option><option value="female">女性</option><option value="other">その他</option><option value="no_answer">回答しない</option></select>
+                </div>
+                <div class="form-group"><label>ディスプレイの大きさ（インチ）</label><br>
+                    <input type="number" name="display_size" step="0.1" required placeholder="例: 13.6" style="font-size: 16px;
+                    padding: 5px; width: 120px;"> インチ
+                </div>
+                <div class="form-group"><label>操作に使用しているデバイス</label><br>
+                    <select name="device" required style="font-size: 16px;
+                    padding: 5px;">
+                        <option value="" disabled selected>選択してください</option>
+                        <option value="touchpad">タッチパッド</option>
+                        <option value="mouse">マウス</option>
+                    </select>
+                </div>
+            </div>`,
+        button_label: '次へ',
+        on_finish: function(data){ 
+            experiment_data.age = data.response.age;
+            experiment_data.gender = data.response.gender; 
+            experiment_data.display_size = data.response.display_size;
+            experiment_data.device = data.response.device;
+        }
+    });
+
+    timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        html: createEmotionForm('pre'),
+        button_label: '次へ',
+        on_finish: function(data) {
+            experiment_data.pre_happy = data.response.pre_happy;
+            experiment_data.pre_relax = data.response.pre_relax;
+            experiment_data.pre_disappoint = data.response.pre_disappoint;
+            experiment_data.pre_tension = data.response.pre_tension;
+        }
+    });
+    timeline.push({ 
+        type: jsPsychHtmlButtonResponse, 
+        stimulus: `<div class="instruction-wrap"><p>実験参加ありがとうございます。<br>宝箱を開けてコインを獲得してください。獲得したコインはお金に換えて実験終了後に報酬としてお渡しします。コインは、2枚で1円として換算されます。</p></div>`, 
+        choices: ['次へ'] 
+    });
+    var chest_test_trial = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+            <div class="instruction-wrap"><p>これらは宝箱です。何度かクリックすると開いてコインを入れることができます。<br>宝箱にはコインが0枚、5枚、または20枚入っています。<br>入っているコインが0枚の宝箱を開けたとき、コインは獲得できません。<br>さあ、これらの宝箱をクリックして開けてみてください。<br>(ここではコインを獲得したり、失ったりすることはありません。)</p><p>宝箱が開くと音が鳴ります。音が聞こえない場合は実験を中断して実験者にお知らせください。</p></div>
+            <div class="chest-container" style="gap:20px;">
+                <div class="chest-btn" id="t-btn1"><img src="${IMG_CHEST_CLOSED}" id="t-img1" class="chest-img"></div>
+                <div class="chest-btn" id="t-btn2"><img src="${IMG_CHEST_CLOSED}" id="t-img2" class="chest-img"></div>
+                <div class="chest-btn" id="t-btn3"><img src="${IMG_CHEST_CLOSED}" id="t-img3" class="chest-img"></div>
+            </div>
+            <br><button id="next-btn" class="jspsych-btn">次へ</button>
+        `,
+        choices: "NO_KEYS",
+        on_load: function(){
+            const values = [0, 5, 20];
+            let test_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+            let next_open_time = Date.now() + (test_vi_intervals.shift() * 1000);
+            function handleClick(id, val, btnId) {
+                let now = Date.now();
+                if (now >= next_open_time) {
+                    document.getElementById(id).src = IMG_CHEST_OPEN;
+                    if(val > 0) { 
+                       playAudio(val === 5 ? 'reward_small' : 'reward_large');
+                    } else { 
+                        playAudio('loss_small');
+                    }
+                    showFloatingPoints(val, 0, btnId);
+                    setTimeout(() => document.getElementById(id).src = IMG_CHEST_CLOSED, 2000);
+                    
+                    if (test_vi_intervals.length === 0) test_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+                    next_open_time = Date.now() + (test_vi_intervals.shift() * 1000);
+                } else {
+                    playAudio('click');
+                }
+            }
+            document.getElementById('t-btn1').onclick = () => handleClick('t-img1', values[0], 't-btn1');
+            document.getElementById('t-btn2').onclick = () => handleClick('t-img2', values[1], 't-btn2');
+            document.getElementById('t-btn3').onclick = () => handleClick('t-img3', values[2], 't-btn3');
+            document.getElementById('next-btn').onclick = () => jsPsych.finishTrial();
+        }
+    };
+    timeline.push(chest_test_trial);
+
+    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap"><p>ゲームでは2つの宝箱が画面に表示されます。2つの宝箱のうち1つはコインが入っており、もう1つはコインが入っていません。宝箱は1回につき20秒間、繰り返し表示され、宝箱が表示されている間は何度でも開けることができます。<br>獲得したコインの枚数は画面下に表示されます。</p></div>`, choices: ['次へ'] });
+    timeline.push({ 
+        type: jsPsychHtmlButtonResponse, 
+        stimulus: `
+            <div class="instruction-wrap">
+                <p>ゲームを始める前に、あなたをサポートしてくれるメンバーを紹介します。ゲームには赤色の服を着た人と青色の服を着た人が登場します。</p>
+                <p>この人たちは、2つの宝箱が表示される前に現れて、左右どちらの箱を開けるとコインを何枚獲得できるか教えてくれます。ただし間違ってしまうこともあります。</p>
+            </div>
+            <div class="scene-container" style="margin-top: 10px; flex-wrap: nowrap;">
+                <div class="character-box">${getImgHtml(IMG_RED_SRC)}</div>
+                <div class="character-box">${getImgHtml(IMG_BLUE_SRC)}</div>
+            </div>`, 
+        choices: ['次へ'] 
+    });
+    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap"><p>説明はこれで終了です。まずは何度か練習してみましょう。<br>(ここではコインを獲得したり、失ったりすることはありません。)</p></div>`, choices: ['練習開始'] });
+
+    timeline.push({
+        type: jsPsychCallFunction,
+        func: function(){
+            // ▼▼▼ 手動設定エリア：キャラクターの色 ▼▼▼
+            experiment_data.inaccurate_color = 'blue'; //20%
+            experiment_data.accurate_color = 'red';  //80%
+            experiment_data.condition = 'gain';
+            // ▲▲▲ 手動設定エリア ここまで ▲▲▲
+
+            experiment_data.inaccurate_img = experiment_data.inaccurate_color === 'blue' ? IMG_BLUE_SRC : IMG_RED_SRC;
+            experiment_data.accurate_img = experiment_data.accurate_color === 'blue' ? IMG_BLUE_SRC : IMG_RED_SRC;
+        }
+    });
+    var practice_cue1 = { type: jsPsychHtmlKeyboardResponse, stimulus: function(){ 
+            return `<div class="cue-wrapper"><div class="character-box"><div class="speech-bubble">右  +5枚</div>${getImgHtml(experiment_data.accurate_img)}</div></div>`;
+    }, choices: "NO_KEYS", trial_duration: 5000 };
+
+    var practice_box1 = {
+        type: jsPsychHtmlKeyboardResponse, stimulus: function() {
+            let img = experiment_data.accurate_img;
+            return `<div class="game-wrapper" style="justify-content: flex-start; padding-top: 8vh;">
+                      <div class="mini-scene" style="flex-wrap: nowrap;"><div class="character-box"><div class="speech-bubble">右  +5枚</div>${getImgHtml(img)}</div></div>
+                      <div class="chest-container" style="margin-top: 5vh;"><div class="chest-btn" id="btn-L"><img src="${IMG_CHEST_CLOSED}" id="img-L" class="chest-img"></div><div class="chest-btn" id="btn-R"><img src="${IMG_CHEST_CLOSED}" id="img-R" class="chest-img"></div></div>
+                      <br><button id="fin-btn" class="jspsych-btn">終了して次へ</button>
+                    </div>`;
+        }, choices: "NO_KEYS",
+        on_load: function(){
+            document.getElementById('score-board').style.display = 'block';
+            document.getElementById('points').innerText = "練習";
+            let test_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+            let next_open_time = Date.now() + (test_vi_intervals.shift() * 1000);
+            function handleClick(side, btnId, imgId, val) {
+                let now = Date.now();
+                if (now >= next_open_time) {
+                    document.getElementById(imgId).src = IMG_CHEST_OPEN;
+                    if(val > 0) {
+                        playAudio(val === 5 ? 'reward_small' : 'reward_large');
+                    } else { playAudio('loss_small'); }
+                    showFloatingPoints(val, side, btnId);
+                    setTimeout(() => document.getElementById(imgId).src = IMG_CHEST_CLOSED, 2000);
+                    
+                    if (test_vi_intervals.length === 0) test_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+                    next_open_time = Date.now() + (test_vi_intervals.shift() * 1000);
+                } else { playAudio('click');
+                }
+            }
+            document.getElementById('btn-R').onclick = () => handleClick(1, 'btn-R', 'img-R', 5);
+            document.getElementById('btn-L').onclick = () => handleClick(0, 'btn-L', 'img-L', 0);
+            document.getElementById('fin-btn').onclick = () => jsPsych.finishTrial();
+        }
+    };
+    var practice_cue2 = { type: jsPsychHtmlKeyboardResponse, stimulus: function(){ return `<div class="cue-wrapper"><div class="character-box"><div class="speech-bubble">左  +5枚<br></div>${getImgHtml(experiment_data.inaccurate_img)}</div></div>`;
+    }, choices: "NO_KEYS", trial_duration: 5000 };
+
+    var practice_box2 = {
+        type: jsPsychHtmlKeyboardResponse, stimulus: function() {
+            let img = experiment_data.inaccurate_img;
+            return `<div class="game-wrapper" style="justify-content: flex-start; padding-top: 8vh;">
+                      <div class="mini-scene" style="flex-wrap: nowrap;"><div class="character-box"><div class="speech-bubble">左  +5枚</div>${getImgHtml(img)}</div></div>
+                      <div class="chest-container" style="margin-top: 5vh;"><div class="chest-btn" id="btn-L"><img src="${IMG_CHEST_CLOSED}" id="img-L" class="chest-img"></div><div class="chest-btn" id="btn-R"><img src="${IMG_CHEST_CLOSED}" id="img-R" class="chest-img"></div></div>
+                      <br><button id="fin-btn" class="jspsych-btn">終了して次へ</button>
+                    </div>`;
+        }, choices: "NO_KEYS",
+        on_load: function(){
+            let test_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+            let next_open_time = Date.now() + (test_vi_intervals.shift() * 1000);
+            function handleClick(side, btnId, imgId, val) {
+                let now = Date.now();
+                if (now >= next_open_time) {
+                    document.getElementById(imgId).src = IMG_CHEST_OPEN;
+                    if(val > 0) {playAudio(val === 5 ? 'reward_small' : 'reward_large'); } else { playAudio('loss_small');
+                    }
+                    showFloatingPoints(val, side, btnId);
+                    setTimeout(() => document.getElementById(imgId).src = IMG_CHEST_CLOSED, 2000);
+                    
+                    if (test_vi_intervals.length === 0) test_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+                    next_open_time = Date.now() + (test_vi_intervals.shift() * 1000);
+                } else { playAudio('click');
+                }
+            }
+            document.getElementById('btn-L').onclick = () => handleClick(0, 'btn-L', 'img-L', 5);
+            document.getElementById('btn-R').onclick = () => handleClick(1, 'btn-R', 'img-R', 0);
+            document.getElementById('fin-btn').onclick = () => jsPsych.finishTrial();
+        }, on_finish: ()=> document.getElementById('score-board').style.display = 'none'
+    };
+    timeline.push(practice_cue1, practice_box1, practice_cue2, practice_box2);
+    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap"><p>それでは本番です。準備ができたら「開始」を押してください。</p></div>`, choices: ['開始'] });
+
+    function generateTrainingTrials() {
+        let trials = [];
+        // 20サイクル分の手動設定エリア
+        let accurate_dirs = [1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0];//80% S2
+        let inaccurate_dirs = [0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0];//20% S1
+
+        // 正確RPの正確性 (16回正解、4回不正解)
+        let accurate_types = [];
+        for(let i=0; i<16; i++) accurate_types.push(1); 
+        for(let i=0; i<4; i++) accurate_types.push(2);  
+        do { accurate_types = shuffleArray(accurate_types); } while (hasConsecutiveValue(accurate_types, 2));
+        // 不正確RPの正確性 (4回正解、16回不正解)
+        let inaccurate_types = [];
+        for(let i=0; i<4; i++) inaccurate_types.push(4);
+        for(let i=0; i<16; i++) inaccurate_types.push(5);  
+        do { inaccurate_types = shuffleArray(inaccurate_types); } while (hasConsecutiveValue(inaccurate_types, 4));
+        for (let i = 0; i < 20; i++) {
+            let dl = accurate_dirs[i];
+            let tl = accurate_types[i];
+            let txtL = (dl === 0 ? "左  +5枚" : "右  +5枚")
+            let rewLL = (tl === 1 ? (dl === 0 ? 5 : 0) : (dl === 0 ? 0 : 5));
+            let rewLR = (tl === 1 ? (dl === 0 ? 0 : 5) : (dl === 0 ? 5 : 0));
+            // block: 5サイクルごとにブロック数を算出 (1〜4)
+            trials.push({ char: 'accurate', text: txtL, rewL: rewLL, rewR: rewLR, cycle: i + 1, block: Math.ceil((i + 1) / 5) });
+            let dr = inaccurate_dirs[i];
+            let tr = inaccurate_types[i];
+            let txtR = (dr === 0 ? "左  +5枚" : "右  +5枚");
+            let rewRL = (tr === 4 ? (dr === 0 ? 5 : 0) : (dr === 0 ? 0 : 5));
+            let rewRR = (tr === 4 ? (dr === 0 ? 0 : 5) : (dr === 0 ? 5 : 0));
+            trials.push({ char: 'inaccurate', text: txtR, rewL: rewRL, rewR: rewRR, cycle: i + 1, block: Math.ceil((i + 1) / 5) });
+        }
+        return trials;
+    }
+    
+    var training_trials = [];
+    var trial_cursor = 0;
+    timeline.push({
+        type: jsPsychCallFunction,
+        func: function() {
+            current_phase = 'training';
+            time_data.training_start = Date.now(); 
+            training_trials = generateTrainingTrials();
+            trial_cursor = 0;
+        }
+    });
+    var cue_screen = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var d = (current_phase==='training') ?
+            training_trials[trial_cursor] : test_trials[trial_cursor];
+            window.current_trial_data = d; 
+            var img = d.char === 'inaccurate' ? experiment_data.inaccurate_img : experiment_data.accurate_img;
+            return `<div class="cue-wrapper"><div class="character-box"><div class="speech-bubble">${d.text}</div>${getImgHtml(img)}</div></div>`;
+        },
+        choices: "NO_KEYS", trial_duration: 5000,
+        on_start: function(){
+            last_side = null;
+            current_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+            next_reward_time = Date.now() + (current_vi_intervals.length>0 ? current_vi_intervals.shift()*1000 : 999999);
+            
+            document.getElementById('score-board').style.display = 'block';
+            document.getElementById('points').innerText = (current_phase==='test') ?
+            '？？？' : total_money + "枚";
+            document.getElementById('trial-counter').style.display = 'block';
+            var d = window.current_trial_data;
+            document.getElementById('trial-counter').innerText = (current_phase === 'training' ? d.cycle + "/20" : (trial_cursor + 1) + "/30");
+        }
+    };
+    var box_choice = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var d = window.current_trial_data;
+            var mini_html = '';
+            
+            if (current_phase === 'training') {
+                var img = d.char === 'inaccurate' ?
+                experiment_data.inaccurate_img : experiment_data.accurate_img;
+                mini_html = `<div class="mini-scene" style="flex-wrap: nowrap;"><div class="character-box"><div class="speech-bubble">${d.text}</div>${getImgHtml(img)}</div></div>`;
+            } else {
+                let red_html = `<div class="character-box"><div class="speech-bubble">${d.red_dir===0?"左":"右"}  +${d.red_val}枚</div>${getImgHtml(IMG_RED_SRC)}</div>`;
+                let blue_html = `<div class="character-box"><div class="speech-bubble">${d.blue_dir===0?"左":"右"}  +${d.blue_val}枚</div>${getImgHtml(IMG_BLUE_SRC)}</div>`;
+                let left_guy = d.pos===0 ? red_html : blue_html;
+                let right_guy = d.pos===0 ? blue_html : red_html;
+                mini_html = `<div class="mini-scene" style="flex-wrap: nowrap;">${left_guy}${right_guy}</div>`;
+            }
+
+            return `
+                <div class="game-wrapper" style="justify-content: flex-start; padding-top: 8vh;">
+                    ${mini_html}
+                    <div class="chest-container" style="margin-top: 5vh;">
+                       
+                        <div class="chest-btn" id="btn-L"><img src="${IMG_CHEST_CLOSED}" id="img-L" class="chest-img"></div>
+                        <div class="chest-btn" id="btn-R"><img src="${IMG_CHEST_CLOSED}" id="img-R" class="chest-img"></div>
+                    </div>
+                </div>
+            `;
+        },
+        choices: "NO_KEYS",
+        trial_duration: 20000, 
+        on_start: function() {
+            window.choice_start_time = Date.now();
+            window.cycle_stats = {
+                clicks: 0,
+                follow: 0,
+                unfollow: 0,
+                points_lost: 0,
+                follow_acc: 0,
+                unfollow_acc: 0,
+                follow_inacc: 0,
+                unfollow_inacc: 0
+            };
+        },
+        on_load: function(){
+            let is_cod = false;
+            document.getElementById('cod-overlay').style.visibility = 'hidden';
+
+            function handleClick(side) {
+                if(is_cod) return;
+                let now = Date.now();
+                let d = window.current_trial_data;
+                let is_switch = (last_side !== null && last_side !== side);
+                last_side = side;
+
+                if(is_switch) {
+                    is_cod = true;
+                    playAudio('switch');
+                    document.getElementById('cod-overlay').innerHTML = `<div class="cod-inner"><div class="spinner"></div><div>お待ちください</div></div>`;
+                    document.getElementById('cod-overlay').style.visibility = 'visible';
+                    setTimeout(() => {
+                        let overlay = document.getElementById('cod-overlay');
+                        if(overlay) overlay.style.visibility = 'hidden';
+                        is_cod = false;
+         
+                    }, 1500);
+                } else {
+                    // ★テストフェーズでも金額を計算する
+                    let rew = 0;
+                    if (current_phase === 'training') {
+                        rew = (side===0) ?
+                        d.rewL : d.rewR; 
+                    } else if (current_phase === 'test') {
+                        rew = (side === d.red_dir) ?
+                        d.red_val : d.blue_val;
+                    }
+
+                    if(now >= next_reward_time) {
+                        let imgId = side===0 ?
+                        'img-L' : 'img-R';
+                        let btnId = side===0 ? 'btn-L' : 'btn-R';
+                        
+                        let el = document.getElementById(imgId);
+                        if(el) el.src = IMG_CHEST_OPEN;
+                        if(current_phase === 'training') {
+                            if(rew > 0) {
+                                playAudio(rew === 5 ? 'reward_small' : 'reward_large');
+                                total_money += rew; 
+                                document.getElementById('points').innerText = total_money + "枚";
+                                window.cycle_stats.points_lost += rew;
+                                // ★トレーニングフェーズの集計
+                                let hint_side = d.text.includes("左") ?
+                                0 : 1; 
+                                if (side === hint_side) {
+                                    if (d.char === 'accurate') summary_data.points_lost_follow_accurate_training += rew;
+                                    else if (d.char === 'inaccurate') summary_data.points_lost_follow_inaccurate_training += rew;
+                                } else {
+                                    // 従わなかった場合
+                                    if (d.char === 'accurate') summary_data.points_lost_unfollow_accurate_training += rew;
+                                    else if (d.char === 'inaccurate') summary_data.points_lost_unfollow_inaccurate_training += rew;
+                                }
+                            } else {
+                                playAudio('loss_small');
+                                summary_data.total_success_training++;
+                            }
+                            showFloatingPoints(rew, side, btnId);
+                        } else if (current_phase === 'test') {
+                            // テストフェーズはプレイヤーには見せずに裏で金額を足す
+                            if (rew > 0) {
+                                total_money_test += rew;
+                                window.cycle_stats.points_lost += rew; 
+                                
+                                // ★テストフェーズの集計
+                                let acc_dir = (experiment_data.accurate_color === 'red') ?
+                                d.red_dir : d.blue_dir;
+                                let inacc_dir = (experiment_data.inaccurate_color === 'red') ? d.red_dir : d.blue_dir;
+                                
+                                if (side === acc_dir) summary_data.points_lost_follow_accurate_test += rew;
+                                else summary_data.points_lost_unfollow_accurate_test += rew;
+                                
+                                if (side === inacc_dir) summary_data.points_lost_follow_inaccurate_test += rew;
+                                else summary_data.points_lost_unfollow_inaccurate_test += rew;
+                            }
+                        }
+                        
+                        if (current_vi_intervals.length === 0) {
+                        
+                            current_vi_intervals = shuffleArray(getFHIntervals(10, 5));
+                        }
+                        next_reward_time = now + (current_vi_intervals.length>0 ? current_vi_intervals.shift()*1000 : 999999);
+                        setTimeout(() => {
+                            let imgEl = document.getElementById(imgId);
+                            if (imgEl) imgEl.src = IMG_CHEST_CLOSED;
+                        }, 2000);
+                    } else {
+                        playAudio('click');
+                    }
+                }
+
+                if (current_phase === 'training') {
+                    summary_data.total_clicks_training++;
+                    window.cycle_stats.clicks++; 
+                    
+                    let hint_side = d.text.includes("左") ? 0 : 1; 
+                    
+                    if (side === hint_side) { window.cycle_stats.follow++;
+                    } 
+                    else { window.cycle_stats.unfollow++;
+                    }
+
+                    if(d.char === 'accurate') {
+                        if (side === hint_side) summary_data.follow_accurate_training++;
+                        else summary_data.unfollow_accurate_training++;
+                    } else {
+                        if (side === hint_side) summary_data.follow_inaccurate_training++;
+                        else summary_data.unfollow_inaccurate_training++;
+                    }
+                    
+                    jsPsych.data.write({ 
+                        phase: current_phase, cycle: d.cycle, block: d.block, trial: trial_cursor, 
+                        response_side: 
+                        side === 0 ? 'left' : 'right', character: d.char,
+                        hint_side: hint_side === 0 ? 'left' : 'right',
+                        reward_val: d.rewL > 0 || d.rewR > 0 ? (d.rewL > 0 ? d.rewL : d.rewR) : 0, 
+                   
+                        lost_val: rew, // ★追加：この試行で実際に失った金額
+                        cod: is_switch, rt: now - window.choice_start_time 
+                    });
+                } else if (current_phase === 'test') {
+                    summary_data.total_clicks_test++;
+                    window.cycle_stats.clicks++; 
+                    
+                    let acc_dir = (experiment_data.accurate_color === 'red') ? d.red_dir : d.blue_dir;
+                    let inacc_dir = (experiment_data.inaccurate_color === 'red') ? d.red_dir : d.blue_dir;
+                    
+                    let followed_acc = (side === acc_dir);
+                    let followed_inacc = (side === inacc_dir);
+
+                    // Case A / Case B ごとの集計
+                    if (d.test_condition === 'CaseA') {
+                        summary_data.caseA_total_clicks++;
+                        if (followed_acc) summary_data.caseA_follow_accurate_clicks++; else summary_data.caseA_unfollow_accurate_clicks++;
+                        if (followed_inacc) summary_data.caseA_follow_inaccurate_clicks++; else summary_data.caseA_unfollow_inaccurate_clicks++;
+                    } else if (d.test_condition === 'CaseB') {
+                        summary_data.caseB_total_clicks++;
+                        if (followed_acc) summary_data.caseB_follow_accurate_clicks++; else summary_data.caseB_unfollow_accurate_clicks++;
+                        if (followed_inacc) summary_data.caseB_follow_inaccurate_clicks++; else summary_data.caseB_unfollow_inaccurate_clicks++;
+                    }
+
+                    if (followed_acc) window.cycle_stats.follow_acc++; else window.cycle_stats.unfollow_acc++;
+                    if (followed_inacc) window.cycle_stats.follow_inacc++; else window.cycle_stats.unfollow_inacc++;
+                    if (side === d.red_dir) summary_data.follow_red_test++; else summary_data.unfollow_red_test++;
+                    if (side === d.blue_dir) summary_data.follow_blue_test++; else summary_data.unfollow_blue_test++;
+                    
+                    jsPsych.data.write({ 
+                        phase: current_phase, 
+                        test_condition: d.test_condition,
+                        cycle: d.cycle, block: d.block, trial: trial_cursor, 
+                        response_side: side === 0 ? 'left' : 'right',
+                        red_hint_side: d.red_dir === 0 ? 'left' : 'right', 
+                        blue_hint_side: d.blue_dir === 0 ? 'left' : 'right',
+                        followed_accurate: followed_acc,
+                        followed_inaccurate: followed_inacc,
+                        red_val: d.red_val, blue_val: d.blue_val,
+                        lost_val: rew, // ★追加：この試行で実際に失った金額
+                        cod: is_switch, rt: now - window.choice_start_time 
+                    });
+                }
+            }
+            document.getElementById('btn-L').onclick = () => handleClick(0);
+            document.getElementById('btn-R').onclick = () => handleClick(1);
+        },
+        on_finish: function(data) {
+            data.phase = current_phase;
+            if (current_phase === 'test') {
+                data.test_condition = window.current_trial_data.test_condition;
+            }
+            data.cycle = window.current_trial_data.cycle;
+            data.block = window.current_trial_data.block;
+            data.event_type = 'cycle_summary';
+            data.cycle_total_clicks = window.cycle_stats.clicks;
+            if (current_phase === 'training') {
+                data.cycle_follow_hint = window.cycle_stats.follow;
+                data.cycle_unfollow_hint = window.cycle_stats.unfollow;
+                data.cycle_lost_points = window.cycle_stats.points_lost;
+            } else if (current_phase === 'test') {
+                data.cycle_follow_accurate = window.cycle_stats.follow_acc;
+                data.cycle_unfollow_accurate = window.cycle_stats.unfollow_acc;
+                data.cycle_follow_inaccurate = window.cycle_stats.follow_inacc;
+                data.cycle_unfollow_inaccurate = window.cycle_stats.unfollow_inacc;
+                data.cycle_lost_points = window.cycle_stats.points_lost;
+            }
+        }
+    };
+    var ici_wait = { 
+        type: jsPsychHtmlKeyboardResponse, 
+        stimulus: '', 
+        choices: "NO_KEYS",
+        trial_duration: 5000,
+        on_start: ()=> { 
+            document.getElementById('cod-overlay').innerHTML = `<div style="color:#333;">次へ</div>`;
+            document.getElementById('cod-overlay').style.visibility = 'visible'; 
+        },
+        on_finish: ()=> document.getElementById('cod-overlay').style.visibility = 'hidden'
+    };
+    var training_block = {
+        timeline: [cue_screen, box_choice, ici_wait],
+        loop_function: function(){ 
+            trial_cursor++;
+            return trial_cursor < 40; 
+        }
+    };
+    timeline.push(training_block);
+    timeline.push({ type: jsPsychCallFunction, func: function() { time_data.training_end = Date.now(); } });
+    timeline.push({
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `<div class="instruction-wrap"><p>お疲れ様でした。一旦休憩です。</p></div>`,
+        choices: ['次へ'],
+        on_start: ()=> { 
+            document.getElementById('trial-counter').style.display = 'none'; 
+            document.getElementById('score-board').style.display = 'none'; 
+        }
+    });
+    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap"><p>ここからは、獲得したコインの枚数が分からなくなります。<br>また今度はサポートメンバーが2人同時に現れます。先ほどと同じように、より多くのコインが入っていると思う宝箱を選んで開けてください。準備ができたら「開始」を押してください。</p></div>`, choices: ['開始'] });
+
+    function generateTestTrials() {
+        let trials = [];
+        // 0: 赤-20(左), 青-5(右) / 1: 赤-20(右), 青-5(左) / 2: 青-20(左), 赤-5(右) / 3: 青-20(右), 赤-5(左)
+        let conditions = [];
+        for(let i=0; i<10; i++) conditions.push('CaseA');
+        for(let i=0; i<20; i++) conditions.push('CaseB');
+        
+        conditions = shuffleArray(conditions);
+        let is_red_accurate = (experiment_data.accurate_color === 'red');
+
+        // CaseB専用のサイクルカウンターを用意
+        let caseB_cycle = 0; 
+
+        for(let i=0; i<30; i++){
+            let c = conditions[i];
+            let red_val, red_dir, blue_val, blue_dir;
+            
+            red_dir = Math.random() < 0.5 ? 0 : 1;
+            blue_dir = red_dir === 0 ? 1 : 0;
+
+            if (c === 'CaseA') {
+                if (is_red_accurate) {
+                    red_val = 20;
+                    blue_val = 5;
+                } else {
+                    red_val = 5;
+                    blue_val = 20;
+                }
+            } else if (c === 'CaseB') {
+                if (is_red_accurate) {
+                    red_val = 5;
+                    blue_val = 20;
+                } else {
+                    red_val = 20;
+                    blue_val = 5;
+                }
+            }
+
+            // キャラの表示位置（0: 赤が左, 1: 赤が右）
+            let pos = Math.random() < 0.5 ? 0 : 1; 
+
+            // サイクルとブロックの計算をCaseBのみに適用
+            let current_cycle = null;
+            let current_block = null;
+
+            if (c === 'CaseB') {
+                caseB_cycle++; // CaseBのときだけカウントアップ
+                current_cycle = caseB_cycle;
+                current_block = Math.ceil(caseB_cycle / 5);
+            } else {
+                // CaseAのときのCSVデータ上の表記
+                current_cycle = 'CaseA'; 
+                current_block = 'CaseA';
+            }
+
+            trials.push({ 
+                test_condition: c, 
+                red_val: red_val, red_dir: red_dir, 
+                blue_val: blue_val, blue_dir: blue_dir,
+                pos: pos,
+                cycle: current_cycle, 
+                block: current_block
+            });
+        }
+        return trials;
+    }
+
+    timeline.push({
+        type: jsPsychCallFunction,
+        func: function() {
+            current_phase = 'test';
+            time_data.test_start = Date.now(); 
+            test_trials = generateTestTrials();
+            trial_cursor = 0;
+        }
+    });
+    var test_cue = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function(){
+            var d = test_trials[trial_cursor];
+            window.current_trial_data = d;
+            let red_html = `<div class="character-box"><div class="speech-bubble">${d.red_dir===0?"左":"右"}  +${d.red_val}枚</div>${getImgHtml(IMG_RED_SRC)}</div>`;
+            let blue_html = `<div class="character-box"><div class="speech-bubble">${d.blue_dir===0?"左":"右"}  +${d.blue_val}枚</div>${getImgHtml(IMG_BLUE_SRC)}</div>`;
+            let left_guy = d.pos===0 ? red_html : blue_html; 
+            let right_guy = d.pos===0 ? blue_html : red_html;
+            return `<div class="cue-wrapper"><div class="scene-container scene-wide-gap" style="flex-wrap: nowrap;">${left_guy}${right_guy}</div></div>`;
+        },
+        choices: "NO_KEYS", trial_duration: 8000, 
+        on_start: function(){
+            last_side = null;
+            document.getElementById('score-board').style.display = 'block'; 
+            document.getElementById('points').innerText = "？？？";
+            document.getElementById('trial-counter').style.display = 'block';
+            document.getElementById('trial-counter').innerText = (trial_cursor + 1) + "/30";
+        }
+    };
+
+    var test_block = {
+        timeline: [test_cue, box_choice, ici_wait],
+        loop_function: function(){ 
+            trial_cursor++;
+            return trial_cursor < 30; 
+        }
+    };
+    timeline.push(test_block);
+    timeline.push({ type: jsPsychCallFunction, func: function() { time_data.test_end = Date.now(); } });
+    timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        on_start: ()=> { document.getElementById('trial-counter').style.display = 'none'; document.getElementById('score-board').style.display = 'none'; },
+        html: function() {
+            return `
+            <div class="instruction-wrap" style="text-align:center; padding: 15px; margin: 10px auto; max-width: 650px;">
+                <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 16px;">今後、それぞれの人物のアドバイスにどの程度従うと思いますか？</h3>
+        
+                <p style="font-size: 14px; margin-bottom: 10px;">（1: 全く思わない 〜 10: 完全に思う）</p>
+                
+                <div style="display:flex; align-items:center; justify-content:center; gap:15px; margin-bottom:20px;">
+                    <div><img src="${experiment_data.inaccurate_img}" style="width:20vw; max-width:80px; height:auto; object-fit:contain;"></div>
+                    <div style="text-align:left; 
+                    font-size: 14px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%;">
+                        ${[1,2,3,4,5,6,7,8,9,10].map(i => `<label><input type="radio" name="eval_inaccurate" value="${i}" required> ${i}</label>`).join('')}
+                    </div>
+                </div>
+                
+           
+             <hr style="margin: 15px 0;">
+                
+                <div style="display:flex;
+                align-items:center; justify-content:center; gap:15px; margin-top:20px;">
+                    <div><img src="${experiment_data.accurate_img}" style="width:20vw;
+                    max-width:80px; height:auto; object-fit:contain;"></div>
+                    <div style="text-align:left;
+                    font-size: 14px; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%;">
+                        ${[1,2,3,4,5,6,7,8,9,10].map(i => `<label><input type="radio" name="eval_accurate" value="${i}" required> ${i}</label>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+        },
+       
+         button_label: '次へ',
+        on_finish: function(data) {
+            if (data && data.response) {
+                experiment_data.eval_inaccurate = data.response.eval_inaccurate || "未回答";
+                experiment_data.eval_accurate = data.response.eval_accurate || "未回答";
+            }
+        }
+    });
+
+    timeline.push({
+    
+      type: jsPsychHtmlButtonResponse,
+      stimulus: function() {
+          return `<div class="instruction-wrap" style="text-align:center;">
+              <h2>お疲れ様でした。ゲーム終了です。</h2>
+              <p>あなたは最終的に<span style="color:red;font-size:24px;font-weight:bold;">3000枚</span>獲得しました。</p>
+          </div>`;
+      },
+      choices: ['次へ'],
+      on_start: ()=> {
+          document.getElementById('score-board').style.display='none';
+          document.getElementById('trial-counter').style.display='none';
+          playAudio('reward_large'); 
+      }
+    });
+
+    // 感情評価を最後に移動
+    timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        html: createEmotionForm('post'),
+        button_label: '回答完了',
+        on_finish: function(data) {
+            if (data && data.response) {
+                experiment_data.post_happy = data.response.post_happy;
+                experiment_data.post_relax 
+                = data.response.post_relax;
+                experiment_data.post_disappoint = data.response.post_disappoint;
+                experiment_data.post_tension = data.response.post_tension;
+            }
+        }
+    });
+    var GAS_URL = "https://script.google.com/macros/s/AKfycby23t9fcKJT1LnRIjpLTdMVCovavOMoXL9xBAyvyhuEITL_hi4XBYCznWgBUB6pMW3cig/exec";
+
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `<div class="instruction-wrap" style="text-align:center;">
+          <p>すべての回答が完了しました。</p>
+          <p>「データを保存する」を押して実験を終了してください。</p>
+      </div>`,
+      choices: ['データを保存する'],
+      on_finish: function() {
+          document.getElementById('score-board').style.display='none';
+          
+          var end_now = Date.now();
+      
+          var train_time = (typeof time_data !== 'undefined' && time_data.training_start) ? Math.round((time_data.training_end - time_data.training_start) / 1000) : 0;
+          var test_time = (typeof time_data !== 'undefined' && time_data.test_start) ? Math.round((time_data.test_end - time_data.test_start) / 1000) : 0;
+          var total_time = (typeof experiment_start_time !== 'undefined') ? Math.round((end_now - experiment_start_time) / 1000) : 0;
+
+          jsPsych.data.addProperties({
+              condition: experiment_data.condition || '不明',
+   
+              age: experiment_data.age || '不明',
+              gender: experiment_data.gender ||
+              '不明',
+              display_size: experiment_data.display_size ||
+              '不明',
+              device: experiment_data.device ||
+              '不明',
+              inaccurate_color: experiment_data.inaccurate_color ||
+              '不明',
+              accurate_color: experiment_data.accurate_color ||
+              '不明',
+              total_clicks_training: typeof summary_data !== 'undefined' ?
+              summary_data.total_clicks_training : 0,
+              follow_accurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.follow_accurate_training : 0,
+              follow_inaccurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.follow_inaccurate_training : 0,
+              unfollow_accurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.unfollow_accurate_training : 0,
+              unfollow_inaccurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.unfollow_inaccurate_training : 0,
+              total_success_training: typeof summary_data !== 'undefined' ?
+              total_clicks_test: typeof summary_data !== 'undefined' ?
+              summary_data.total_clicks_test : 0,
+              follow_red_test: typeof summary_data !== 'undefined' ?
+              summary_data.follow_red_test : 0,
+              follow_blue_test: typeof summary_data !== 'undefined' ?
+              summary_data.follow_blue_test : 0,
+              unfollow_red_test: typeof summary_data !== 'undefined' ?
+              summary_data.unfollow_red_test : 0,
+              unfollow_blue_test: typeof summary_data !== 'undefined' ?
+              summary_data.unfollow_blue_test : 0,
+              
+              caseA_total_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_total_clicks : 0,
+              caseA_follow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_follow_accurate_clicks : 0,
+              caseA_unfollow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_unfollow_accurate_clicks : 0,
+              caseA_follow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_follow_inaccurate_clicks : 0,
+              caseA_unfollow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_unfollow_inaccurate_clicks : 0,
+              
+              caseB_total_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_total_clicks : 0,
+              caseB_follow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_follow_accurate_clicks : 0,
+              caseB_unfollow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_unfollow_accurate_clicks : 0,
+              caseB_follow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_follow_inaccurate_clicks : 0,
+              caseB_unfollow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_unfollow_inaccurate_clicks : 0,
+
+              training_duration_sec: train_time,
+              test_duration_sec: test_time,
+              total_experiment_sec: total_time,
+              total_money_lost: typeof total_money !== 'undefined' ?
+              total_money : 0,
+              total_money_lost_test: typeof total_money_test !== 'undefined' ?
+              total_money_test : 0, 
+              total_money_lost_all: (typeof total_money !== 'undefined' ? total_money : 0) + (typeof total_money_test !== 'undefined' ? total_money_test : 0),
+              points_lost_follow_accurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_accurate_training : 0,
+              points_lost_follow_inaccurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_inaccurate_training : 0,
+              points_lost_unfollow_accurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_accurate_training : 0,
+              points_lost_unfollow_inaccurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_inaccurate_training : 0,
+              points_lost_follow_accurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_accurate_test : 0,
+              points_lost_follow_inaccurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_inaccurate_test : 0,
+              points_lost_unfollow_accurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_accurate_test : 0,
+              points_lost_unfollow_inaccurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_inaccurate_test : 0,
+              final_money_reward: 3000, // 最終獲得金額は必ず3000枚 (注: 画面表記等は1500のままです)
+              eval_inaccurate: experiment_data.eval_inaccurate ||
+              '未回答',
+              eval_accurate: experiment_data.eval_accurate ||
+              '未回答',
+              pre_happy: experiment_data.pre_happy ||
+              '未回答',
+              pre_relax: experiment_data.pre_relax ||
+              '未回答',
+              pre_disappoint: experiment_data.pre_disappoint ||
+              '未回答',
+              pre_tension: experiment_data.pre_tension ||
+              '未回答',
+              post_happy: experiment_data.post_happy ||
+              '未回答',
+              post_relax: experiment_data.post_relax ||
+              '未回答',
+              post_disappoint: experiment_data.post_disappoint ||
+              '未回答',
+              post_tension: experiment_data.post_tension ||
+              '未回答'
+          });
+
+          var now = new Date();
+          var yyyy = now.getFullYear();
+          var mm = String(now.getMonth() + 1).padStart(2, '0');
+          var dd = String(now.getDate()).padStart(2, '0');
+          var hh = String(now.getHours()).padStart(2, '0');
+          var min = String(now.getMinutes()).padStart(2, '0');
+          var baseName = 'data_' + yyyy + mm + dd + '_' + hh + min;
+          var csvData = jsPsych.data.get().csv();
+          
+          // ファイル名に明示的に .csv をつける（txt保存を防ぐ）
+          var fileName = baseName + '.csv';
+          // Google Driveへの送信を先に実行し、終わってからダウンロードする
+          // Google Driveへの送信を先に実行し、終わってからダウンロードする
+          if (GAS_URL !== "") {
+              fetch(GAS_URL, { 
+                  method: "POST", 
+                  mode: "no-cors", // ★CORSエラーを回避するために追加
+                  headers: { "Content-Type": "text/plain" }, 
+                  body: JSON.stringify({ file_name: fileName, file_data: csvData })
+              })
+              .then(() => {
+                  // 注: no-corsモードでは成否に関わらずここに入ります
+                  alert("データ送信処理を受け付けました。ブラウザを閉じてください。");
+              })
+              .catch((error) => {
+                  alert("通信自体に失敗しました。ローカルにのみ保存します。");
+                  console.error("Drive保存エラー", error);
+              })
+              .finally(() => {
+                  // 送信処理の後に、パソコンにダウンロード
+                  jsPsych.data.get().localSave('csv', fileName);
+              });
+          } else {
+              // GAS_URLがない場合はすぐダウンロード
+              jsPsych.data.get().localSave('csv', fileName);
+          }
+      }
+    });
+
+    jsPsych.run(timeline);
+  </script>
+</html>
