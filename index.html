@@ -276,7 +276,9 @@
         el.className = 'point-feedback';
         
         if (parseInt(amount) === 20) {
-            el.style.color = '#ff0000'; // 大当たりは赤
+            el.style.color = '#e6b800'; // 20枚は黄色
+        } else if (parseInt(amount) === 5) {
+            el.style.color = '#e6b800'; // 5枚も黄色
         } else if (parseInt(amount) === 0) {
             el.style.color = '#777777'; // 0枚はグレー（目立たなくする）
         }
@@ -315,10 +317,10 @@
         unfollow_inaccurate_training: 0, 
         total_success_training: 0,
         total_clicks_test: 0,
-        points_gain_follow_accurate_training: 0,
-        points_gain_follow_inaccurate_training: 0,
-        points_gain_unfollow_accurate_training: 0,
-        points_gain_unfollow_inaccurate_training: 0,
+        points_lost_follow_accurate_training: 0,
+        points_lost_follow_inaccurate_training: 0,
+        points_lost_unfollow_accurate_training: 0,
+        points_lost_unfollow_inaccurate_training: 0,
         follow_red_test: 0,
         follow_blue_test: 0,
         unfollow_red_test: 0,
@@ -362,10 +364,10 @@
             <h3 style="margin-top:0;">いまの気持ちを尋ねます。当てはまるものを選択してください。</h3>
             <p style="font-size:14px;">（1: 全く感じない 〜 9: 極めて強く感じる）</p>`;
         const emotions = [
-            { id: 'happy', label: '幸せだ' },
-            { id: 'relax', label: 'リラックスしている' },
-            { id: 'disappoint', label: 'がっかりしている' },
-            { id: 'tension', label: '緊張している' }
+            { id: 'happy', label: '嬉しい' },
+            { id: 'relax', label: '安心だ' },
+            { id: 'disappoint', label: 'がっかりだ' },
+            { id: 'tension', label: '不安だ' }
         ];
         emotions.forEach(emo => {
             html += `
@@ -593,7 +595,7 @@
         }, on_finish: ()=> document.getElementById('score-board').style.display = 'none'
     };
     timeline.push(practice_cue1, practice_box1, practice_cue2, practice_box2);
-    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap"><p>それでは本番です。準備ができたら「開始」を押してください。</p></div>`, choices: ['開始'] });
+    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap"><p>それでは本番です。なるべくたくさんのコインを獲得してください。準備ができたら「開始」を押してください。</p></div>`, choices: ['開始'] });
 
     function generateTrainingTrials() {
         let trials = [];
@@ -612,19 +614,30 @@
         for(let i=0; i<16; i++) inaccurate_types.push(5);  
         do { inaccurate_types = shuffleArray(inaccurate_types); } while (hasConsecutiveValue(inaccurate_types, 4));
         for (let i = 0; i < 20; i++) {
+            // ① 正確な人のデータを一旦変数にまとめる
             let dl = accurate_dirs[i];
             let tl = accurate_types[i];
-            let txtL = (dl === 0 ? "左  +5枚" : "右  +5枚")
+            let txtL = (dl === 0 ? "左  +5枚" : "右  +5枚"); // 利益版は +5枚
             let rewLL = (tl === 1 ? (dl === 0 ? 5 : 0) : (dl === 0 ? 0 : 5));
             let rewLR = (tl === 1 ? (dl === 0 ? 0 : 5) : (dl === 0 ? 5 : 0));
-            // block: 5サイクルごとにブロック数を算出 (1〜4)
-            trials.push({ char: 'accurate', text: txtL, rewL: rewLL, rewR: rewLR, cycle: i + 1, block: Math.ceil((i + 1) / 5) });
+            let acc_trial = { char: 'accurate', text: txtL, rewL: rewLL, rewR: rewLR, cycle: i + 1, block: Math.ceil((i + 1) / 5) };
+
+            // ② 不正確な人のデータを一旦変数にまとめる
             let dr = inaccurate_dirs[i];
             let tr = inaccurate_types[i];
-            let txtR = (dr === 0 ? "左  +5枚" : "右  +5枚");
+            let txtR = (dr === 0 ? "左  +5枚" : "右  +5枚"); // 利益版は +5枚
             let rewRL = (tr === 4 ? (dr === 0 ? 5 : 0) : (dr === 0 ? 0 : 5));
             let rewRR = (tr === 4 ? (dr === 0 ? 0 : 5) : (dr === 0 ? 5 : 0));
-            trials.push({ char: 'inaccurate', text: txtR, rewL: rewRL, rewR: rewRR, cycle: i + 1, block: Math.ceil((i + 1) / 5) });
+            let inacc_trial = { char: 'inaccurate', text: txtR, rewL: rewRL, rewR: rewRR, cycle: i + 1, block: Math.ceil((i + 1) / 5) };
+            
+            // ③ ★50%の確率で順番を入れ替えて push する
+            if (Math.random() < 0.5) {
+                trials.push(acc_trial);
+                trials.push(inacc_trial);
+            } else {
+                trials.push(inacc_trial);
+                trials.push(acc_trial);
+            }
         }
         return trials;
     }
@@ -670,13 +683,12 @@
             var mini_html = '';
             
             if (current_phase === 'training') {
-                var img = d.char === 'inaccurate' ?
-                experiment_data.inaccurate_img : experiment_data.accurate_img;
+                var img = d.char === 'inaccurate' ? experiment_data.inaccurate_img : experiment_data.accurate_img;
                 mini_html = `<div class="mini-scene" style="flex-wrap: nowrap;"><div class="character-box"><div class="speech-bubble">${d.text}</div>${getImgHtml(img)}</div></div>`;
             } else {
                 let red_html = `<div class="character-box"><div class="speech-bubble">${d.red_dir===0?"左":"右"}  +${d.red_val}枚</div>${getImgHtml(IMG_RED_SRC)}</div>`;
                 let blue_html = `<div class="character-box"><div class="speech-bubble">${d.blue_dir===0?"左":"右"}  +${d.blue_val}枚</div>${getImgHtml(IMG_BLUE_SRC)}</div>`;
-                let left_guy = d.pos===0 ? red_html : blue_html;
+                let left_guy = d.pos===0 ? red_html : blue_html; 
                 let right_guy = d.pos===0 ? blue_html : red_html;
                 mini_html = `<div class="mini-scene" style="flex-wrap: nowrap;">${left_guy}${right_guy}</div>`;
             }
@@ -685,7 +697,6 @@
                 <div class="game-wrapper" style="justify-content: flex-start; padding-top: 8vh;">
                     ${mini_html}
                     <div class="chest-container" style="margin-top: 5vh;">
-                       
                         <div class="chest-btn" id="btn-L"><img src="${IMG_CHEST_CLOSED}" id="img-L" class="chest-img"></div>
                         <div class="chest-btn" id="btn-R"><img src="${IMG_CHEST_CLOSED}" id="img-R" class="chest-img"></div>
                     </div>
@@ -697,14 +708,8 @@
         on_start: function() {
             window.choice_start_time = Date.now();
             window.cycle_stats = {
-                clicks: 0,
-                follow: 0,
-                unfollow: 0,
-                points_gain: 0,
-                follow_acc: 0,
-                unfollow_acc: 0,
-                follow_inacc: 0,
-                unfollow_inacc: 0
+                clicks: 0, follow: 0, unfollow: 0, points_earned: 0,
+                follow_acc: 0, unfollow_acc: 0, follow_inacc: 0, unfollow_inacc: 0
             };
         },
         on_load: function(){
@@ -727,72 +732,65 @@
                         let overlay = document.getElementById('cod-overlay');
                         if(overlay) overlay.style.visibility = 'hidden';
                         is_cod = false;
-         
                     }, 1500);
                 } else {
-                    // ★テストフェーズでも金額を計算する
                     let rew = 0;
                     if (current_phase === 'training') {
-                        rew = (side===0) ?
-                        d.rewL : d.rewR; 
+                        rew = (side===0) ? d.rewL : d.rewR; 
                     } else if (current_phase === 'test') {
-                        rew = (side === d.red_dir) ?
-                        d.red_val : d.blue_val;
+                        rew = (side === d.red_dir) ? d.red_val : d.blue_val;
                     }
 
                     if(now >= next_reward_time) {
-                        let imgId = side===0 ?
-                        'img-L' : 'img-R';
+                        let imgId = side===0 ? 'img-L' : 'img-R';
                         let btnId = side===0 ? 'btn-L' : 'btn-R';
                         
                         let el = document.getElementById(imgId);
-                        if(el) el.src = IMG_CHEST_OPEN;
+                        if(el && current_phase === 'training') {
+                            el.src = IMG_CHEST_OPEN;
+                        }
+                        
                         if(current_phase === 'training') {
                             if(rew > 0) {
                                 playAudio(rew === 5 ? 'reward_small' : 'reward_large');
                                 total_money += rew; 
                                 document.getElementById('points').innerText = total_money + "枚";
-                                window.cycle_stats.points_gain += rew;
-                                // ★トレーニングフェーズの集計
-                                let hint_side = d.text.includes("左") ?
-                                0 : 1; 
+                                window.cycle_stats.points_earned += rew; 
+                                summary_data.total_success_training++;
+                                
+                                let hint_side = d.text.includes("左") ? 0 : 1; 
                                 if (side === hint_side) {
-                                    if (d.char === 'accurate') summary_data.points_gain_follow_accurate_training += rew;
-                                    else if (d.char === 'inaccurate') summary_data.points_gain_follow_inaccurate_training += rew;
+                                    if (d.char === 'accurate') summary_data.points_earned_follow_accurate_training += rew;
+                                    else if (d.char === 'inaccurate') summary_data.points_earned_follow_inaccurate_training += rew;
                                 } else {
-                                    // 従わなかった場合
-                                    if (d.char === 'accurate') summary_data.points_gain_unfollow_accurate_training += rew;
-                                    else if (d.char === 'inaccurate') summary_data.points_gain_unfollow_inaccurate_training += rew;
+                                    if (d.char === 'accurate') summary_data.points_earned_unfollow_accurate_training += rew;
+                                    else if (d.char === 'inaccurate') summary_data.points_earned_unfollow_inaccurate_training += rew;
                                 }
                             } else {
                                 playAudio('loss_small');
-                                summary_data.total_success_training++;
                             }
                             showFloatingPoints(rew, side, btnId);
                         } else if (current_phase === 'test') {
-                            // テストフェーズはプレイヤーには見せずに裏で金額を足す
                             if (rew > 0) {
                                 total_money_test += rew;
-                                window.cycle_stats.points_gain += rew; 
+                                window.cycle_stats.points_earned += rew; 
                                 
-                                // ★テストフェーズの集計
-                                let acc_dir = (experiment_data.accurate_color === 'red') ?
-                                d.red_dir : d.blue_dir;
+                                let acc_dir = (experiment_data.accurate_color === 'red') ? d.red_dir : d.blue_dir;
                                 let inacc_dir = (experiment_data.inaccurate_color === 'red') ? d.red_dir : d.blue_dir;
                                 
-                                if (side === acc_dir) summary_data.points_gain_follow_accurate_test += rew;
-                                else summary_data.points_gain_unfollow_accurate_test += rew;
+                                if (side === acc_dir) summary_data.points_earned_follow_accurate_test += rew;
+                                else summary_data.points_earned_unfollow_accurate_test += rew;
                                 
-                                if (side === inacc_dir) summary_data.points_gain_follow_inaccurate_test += rew;
-                                else summary_data.points_gain_unfollow_inaccurate_test += rew;
+                                if (side === inacc_dir) summary_data.points_earned_follow_inaccurate_test += rew;
+                                else summary_data.points_earned_unfollow_inaccurate_test += rew;
                             }
                         }
                         
                         if (current_vi_intervals.length === 0) {
-                        
                             current_vi_intervals = shuffleArray(getFHIntervals(10, 5));
                         }
                         next_reward_time = now + (current_vi_intervals.length>0 ? current_vi_intervals.shift()*1000 : 999999);
+                        
                         setTimeout(() => {
                             let imgEl = document.getElementById(imgId);
                             if (imgEl) imgEl.src = IMG_CHEST_CLOSED;
@@ -802,33 +800,33 @@
                     }
                 }
 
+                // ★★★ 1クリックごとの記録（ここに書くのが正解） ★★★
                 if (current_phase === 'training') {
                     summary_data.total_clicks_training++;
                     window.cycle_stats.clicks++; 
                     
                     let hint_side = d.text.includes("左") ? 0 : 1; 
+                    let is_follow = (side === hint_side);
                     
-                    if (side === hint_side) { window.cycle_stats.follow++;
-                    } 
-                    else { window.cycle_stats.unfollow++;
-                    }
+                    if (is_follow) { window.cycle_stats.follow++; } 
+                    else { window.cycle_stats.unfollow++; }
 
                     if(d.char === 'accurate') {
-                        if (side === hint_side) summary_data.follow_accurate_training++;
+                        if (is_follow) summary_data.follow_accurate_training++;
                         else summary_data.unfollow_accurate_training++;
                     } else {
-                        if (side === hint_side) summary_data.follow_inaccurate_training++;
+                        if (is_follow) summary_data.follow_inaccurate_training++;
                         else summary_data.unfollow_inaccurate_training++;
                     }
                     
                     jsPsych.data.write({ 
+                        event_type: 'click', // ★これがクリックごとの目印
                         phase: current_phase, cycle: d.cycle, block: d.block, trial: trial_cursor, 
-                        response_side: 
-                        side === 0 ? 'left' : 'right', character: d.char,
+                        response_side: side === 0 ? 'left' : 'right', 
+                        character: d.char,
                         hint_side: hint_side === 0 ? 'left' : 'right',
-                        reward_val: d.rewL > 0 || d.rewR > 0 ? (d.rewL > 0 ? d.rewL : d.rewR) : 0, 
-                   
-                        gain_val: rew, // ★追加：この試行で実際に失った金額
+                        followed_hint: is_follow, 
+                        reward_val: typeof rew !== 'undefined' ? rew : 0, // 利益版は獲得した金額
                         cod: is_switch, rt: now - window.choice_start_time 
                     });
                 } else if (current_phase === 'test') {
@@ -837,37 +835,30 @@
                     
                     let acc_dir = (experiment_data.accurate_color === 'red') ? d.red_dir : d.blue_dir;
                     let inacc_dir = (experiment_data.inaccurate_color === 'red') ? d.red_dir : d.blue_dir;
-                    
+                    let acc_val = (experiment_data.accurate_color === 'red') ? d.red_val : d.blue_val;
+                    let inacc_val = (experiment_data.inaccurate_color === 'red') ? d.red_val : d.blue_val;
+
                     let followed_acc = (side === acc_dir);
                     let followed_inacc = (side === inacc_dir);
-
-                    // Case A / Case B ごとの集計
-                    if (d.test_condition === 'CaseA') {
-                        summary_data.caseA_total_clicks++;
-                        if (followed_acc) summary_data.caseA_follow_accurate_clicks++; else summary_data.caseA_unfollow_accurate_clicks++;
-                        if (followed_inacc) summary_data.caseA_follow_inaccurate_clicks++; else summary_data.caseA_unfollow_inaccurate_clicks++;
-                    } else if (d.test_condition === 'CaseB') {
-                        summary_data.caseB_total_clicks++;
-                        if (followed_acc) summary_data.caseB_follow_accurate_clicks++; else summary_data.caseB_unfollow_accurate_clicks++;
-                        if (followed_inacc) summary_data.caseB_follow_inaccurate_clicks++; else summary_data.caseB_unfollow_inaccurate_clicks++;
-                    }
 
                     if (followed_acc) window.cycle_stats.follow_acc++; else window.cycle_stats.unfollow_acc++;
                     if (followed_inacc) window.cycle_stats.follow_inacc++; else window.cycle_stats.unfollow_inacc++;
                     if (side === d.red_dir) summary_data.follow_red_test++; else summary_data.unfollow_red_test++;
                     if (side === d.blue_dir) summary_data.follow_blue_test++; else summary_data.unfollow_blue_test++;
-                    
+
                     jsPsych.data.write({ 
-                        phase: current_phase, 
-                        test_condition: d.test_condition,
+                        event_type: 'click', // ★これがクリックごとの目印
+                        phase: current_phase, test_condition: d.test_condition,
                         cycle: d.cycle, block: d.block, trial: trial_cursor, 
-                        response_side: side === 0 ? 'left' : 'right',
+                        response_side: side === 0 ? 'left' : 'right', 
+                        accurate_hint_side: acc_dir === 0 ? 'left' : 'right', 
+                        inaccurate_hint_side: inacc_dir === 0 ? 'left' : 'right',
+                        accurate_val: acc_val, inaccurate_val: inacc_val, 
+                        followed_accurate: followed_acc, followed_inaccurate: followed_inacc,
                         red_hint_side: d.red_dir === 0 ? 'left' : 'right', 
                         blue_hint_side: d.blue_dir === 0 ? 'left' : 'right',
-                        followed_accurate: followed_acc,
-                        followed_inaccurate: followed_inacc,
                         red_val: d.red_val, blue_val: d.blue_val,
-                        gain_val: rew, // ★追加：この試行で実際に失った金額
+                        reward_val: typeof rew !== 'undefined' ? rew : 0, // 利益版は獲得した金額
                         cod: is_switch, rt: now - window.choice_start_time 
                     });
                 }
@@ -876,24 +867,24 @@
             document.getElementById('btn-R').onclick = () => handleClick(1);
         },
         on_finish: function(data) {
+            // ★★★ サイクルごとのまとめ記録（行が分かれます） ★★★
+            data.event_type = 'cycle_summary'; // ★これはサイクルのまとめ
             data.phase = current_phase;
-            if (current_phase === 'test') {
-                data.test_condition = window.current_trial_data.test_condition;
-            }
+            if (current_phase === 'test') { data.test_condition = window.current_trial_data.test_condition; }
             data.cycle = window.current_trial_data.cycle;
             data.block = window.current_trial_data.block;
-            data.event_type = 'cycle_summary';
             data.cycle_total_clicks = window.cycle_stats.clicks;
+            
             if (current_phase === 'training') {
                 data.cycle_follow_hint = window.cycle_stats.follow;
                 data.cycle_unfollow_hint = window.cycle_stats.unfollow;
-                data.cycle_gain_points = window.cycle_stats.points_gain;
+                data.cycle_earned_points = window.cycle_stats.points_earned;
             } else if (current_phase === 'test') {
                 data.cycle_follow_accurate = window.cycle_stats.follow_acc;
                 data.cycle_unfollow_accurate = window.cycle_stats.unfollow_acc;
                 data.cycle_follow_inaccurate = window.cycle_stats.follow_inacc;
                 data.cycle_unfollow_inaccurate = window.cycle_stats.unfollow_inacc;
-                data.cycle_gain_points = window.cycle_stats.points_gain;
+                data.cycle_earned_points = window.cycle_stats.points_earned;
             }
         }
     };
@@ -926,7 +917,12 @@
             document.getElementById('score-board').style.display = 'none'; 
         }
     });
-    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap"><p>ここからは、獲得したコインの枚数が分からなくなります。<br>また今度はサポートメンバーが2人同時に現れます。先ほどと同じように、より多くのコインが入っていると思う宝箱を選んで開けてください。準備ができたら「開始」を押してください。</p></div>`, choices: ['開始'] });
+    timeline.push({ type: jsPsychHtmlButtonResponse, stimulus: `<div class="instruction-wrap">
+        <p>ここからは、宝箱が開いても、そのことが画面上に表示されなくなり、獲得したコインの枚数も画面には表示されなくなります。</p>
+        <p>（※見えなくなるだけで、獲得したコインは裏で計算されています）</p>
+        <p>また今度はサポートメンバーが2人同時に現れます。先ほどと同じように、なるべくたくさんのコインを獲得してください。</p>
+        <p>準備ができたら「開始」を押してください。</p>
+        </div>`, choices: ['開始'] });
 
     function generateTestTrials() {
         let trials = [];
@@ -1076,6 +1072,22 @@
         }
     });
 
+// 結果発表前の感情評価 
+    timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        on_start: ()=> { document.getElementById('trial-counter').style.display = 'none'; document.getElementById('score-board').style.display = 'none'; },
+        html: createEmotionForm('mid'), // midという名前で作成します
+        button_label: '回答完了',
+        on_finish: function(data) {
+            if (data && data.response) {
+                experiment_data.mid_happy = data.response.mid_happy;
+                experiment_data.mid_relax = data.response.mid_relax;
+                experiment_data.mid_disappoint = data.response.mid_disappoint;
+                experiment_data.mid_tension = data.response.mid_tension;
+            }
+        }
+    });
+
     timeline.push({
     
       type: jsPsychHtmlButtonResponse,
@@ -1115,6 +1127,7 @@
       stimulus: `<div class="instruction-wrap" style="text-align:center;">
           <p>すべての回答が完了しました。</p>
           <p>「データを保存する」を押して実験を終了してください。</p>
+          <p><span style="color:red;font-size:24px;font-weight:bold;">ブラウザを閉じずに</span>実験者にお声掛けください。</p>
       </div>`,
       choices: ['データを保存する'],
       on_finish: function() {
@@ -1151,6 +1164,7 @@
               unfollow_inaccurate_training: typeof summary_data !== 'undefined' ?
               summary_data.unfollow_inaccurate_training : 0,
               total_success_training: typeof summary_data !== 'undefined' ?
+              summary_data.total_success_training : 0,
               total_clicks_test: typeof summary_data !== 'undefined' ?
               summary_data.total_clicks_test : 0,
               follow_red_test: typeof summary_data !== 'undefined' ?
@@ -1177,48 +1191,44 @@
               training_duration_sec: train_time,
               test_duration_sec: test_time,
               total_experiment_sec: total_time,
-              total_money_gain: typeof total_money !== 'undefined' ?
+              total_money_lost: typeof total_money !== 'undefined' ?
               total_money : 0,
-              total_money_gain_test: typeof total_money_test !== 'undefined' ?
+              total_money_lost_test: typeof total_money_test !== 'undefined' ?
               total_money_test : 0, 
-              total_money_gain_all: (typeof total_money !== 'undefined' ? total_money : 0) + (typeof total_money_test !== 'undefined' ? total_money_test : 0),
-              points_gain_follow_accurate_training: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_follow_accurate_training : 0,
-              points_gain_follow_inaccurate_training: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_follow_inaccurate_training : 0,
-              points_gain_unfollow_accurate_training: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_unfollow_accurate_training : 0,
-              points_gain_unfollow_inaccurate_training: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_unfollow_inaccurate_training : 0,
-              points_gain_follow_accurate_test: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_follow_accurate_test : 0,
-              points_gain_follow_inaccurate_test: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_follow_inaccurate_test : 0,
-              points_gain_unfollow_accurate_test: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_unfollow_accurate_test : 0,
-              points_gain_unfollow_inaccurate_test: typeof summary_data !== 'undefined' ?
-              summary_data.points_gain_unfollow_inaccurate_test : 0,
-              final_money_reward: 3000, // 最終獲得金額は必ず3000枚 (注: 画面表記等は1500のままです)
+              total_money_lost_all: (typeof total_money !== 'undefined' ? total_money : 0) + (typeof total_money_test !== 'undefined' ? total_money_test : 0),
+              points_lost_follow_accurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_accurate_training : 0,
+              points_lost_follow_inaccurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_inaccurate_training : 0,
+              points_lost_unfollow_accurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_accurate_training : 0,
+              points_lost_unfollow_inaccurate_training: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_inaccurate_training : 0,
+              points_lost_follow_accurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_accurate_test : 0,
+              points_lost_follow_inaccurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_follow_inaccurate_test : 0,
+              points_lost_unfollow_accurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_accurate_test : 0,
+              points_lost_unfollow_inaccurate_test: typeof summary_data !== 'undefined' ?
+              summary_data.points_lost_unfollow_inaccurate_test : 0,
+              final_money_reward: 3000, // 最終獲得金額は必ず3000枚
               eval_inaccurate: experiment_data.eval_inaccurate ||
               '未回答',
               eval_accurate: experiment_data.eval_accurate ||
               '未回答',
-              pre_happy: experiment_data.pre_happy ||
-              '未回答',
-              pre_relax: experiment_data.pre_relax ||
-              '未回答',
-              pre_disappoint: experiment_data.pre_disappoint ||
-              '未回答',
-              pre_tension: experiment_data.pre_tension ||
-              '未回答',
-              post_happy: experiment_data.post_happy ||
-              '未回答',
-              post_relax: experiment_data.post_relax ||
-              '未回答',
-              post_disappoint: experiment_data.post_disappoint ||
-              '未回答',
-              post_tension: experiment_data.post_tension ||
-              '未回答'
+              pre_happy: experiment_data.pre_happy ||'未回答',
+              pre_relax: experiment_data.pre_relax ||'未回答',
+              pre_disappoint: experiment_data.pre_disappoint ||'未回答',
+              pre_tension: experiment_data.pre_tension ||'未回答',
+              mid_happy: experiment_data.mid_happy || '未回答',
+              mid_relax: experiment_data.mid_relax || '未回答',
+              mid_disappoint: experiment_data.mid_disappoint || '未回答',
+              mid_tension: experiment_data.mid_tension || '未回答',
+              post_happy: experiment_data.post_happy ||'未回答',
+              post_relax: experiment_data.post_relax ||'未回答',
+              post_disappoint: experiment_data.post_disappoint ||'未回答',
+              post_tension: experiment_data.post_tension ||'未回答'
           });
 
           var now = new Date();
