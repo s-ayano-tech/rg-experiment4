@@ -321,18 +321,6 @@
         unfollow_accurate_test: 0,
         follow_inaccurate_test: 0,
         unfollow_inaccurate_test: 0,
-        // Case A, Case B 用の詳細集計
-        caseA_total_clicks: 0,
-        caseA_follow_accurate_clicks: 0,
-        caseA_unfollow_accurate_clicks: 0,
-        caseA_follow_inaccurate_clicks: 0,
-        caseA_unfollow_inaccurate_clicks: 0,
-        
-        caseB_total_clicks: 0,
-        caseB_follow_accurate_clicks: 0,
-        caseB_unfollow_accurate_clicks: 0,
-        caseB_follow_inaccurate_clicks: 0,
-        caseB_unfollow_inaccurate_clicks: 0
     };
     var time_data = {
         training_start: 0,
@@ -502,8 +490,8 @@
         type: jsPsychCallFunction,
         func: function(){
             // ▼▼▼ 手動設定エリア：キャラクターの色 ▼▼▼
-            experiment_data.inaccurate_color = 'blue'; //20%
-            experiment_data.accurate_color = 'red';  //80%
+            experiment_data.inaccurate_color = 'red'; //20%
+            experiment_data.accurate_color = 'blue';  //80%
             experiment_data.condition = 'gain';
             // ▲▲▲ 手動設定エリア ここまで ▲▲▲
 
@@ -586,8 +574,8 @@
     function generateTrainingTrials() {
         let trials = [];
         // 20サイクル分の手動設定エリア
-        let accurate_dirs = [1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0];//80% S2
-        let inaccurate_dirs = [0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0];//20% S1
+        let accurate_dirs = [0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0];//80% S1
+        let inaccurate_dirs = [1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0];//20% S2
 
         // 正確RPの正確性 (16回正解、4回不正解)
         let accurate_types = [];
@@ -696,7 +684,8 @@
             window.cycle_stats = {
                 clicks: 0, follow: 0, unfollow: 0, points_earned: 0,
                 follow_acc: 0, unfollow_acc: 0, follow_inacc: 0, unfollow_inacc: 0,
-                points_earned_follow_acc: 0
+                points_earned_follow_acc: 0, points_earned_unfollow_acc: 0,
+                points_earned_follow_inacc: 0, points_earned_unfollow_inacc: 0
             };
         },
         on_load: function(){
@@ -744,13 +733,24 @@
                         document.getElementById('points').innerText = total_money + "枚";
                         window.cycle_stats.points_earned += rew; 
         
-                        let hint_side = d.text.includes("左") ? 0 : 1; 
-                        if (side === hint_side) {
-                            if (d.char === 'accurate') {
+                        let hint_side = d.text.includes("左") ? 0 : 1;
+                        let is_follow = (side === hint_side); // ヒント通りだったか判定
+                        // 4パターン全てに分岐して加算する
+                        if (d.char === 'accurate') {
+                            if (is_follow) {
                                 summary_data.points_earned_follow_accurate_training += rew;
-                                window.cycle_stats.points_earned_follow_acc += rew; // ★追加
-                            } else if (d.char === 'inaccurate') {
+                                window.cycle_stats.points_earned_follow_acc += rew; 
+                            } else {
+                                summary_data.points_earned_unfollow_accurate_training += rew;
+                                window.cycle_stats.points_earned_unfollow_acc += rew; 
+                            }
+                        } else if (d.char === 'inaccurate') {
+                            if (is_follow) {
                                 summary_data.points_earned_follow_inaccurate_training += rew;
+                                window.cycle_stats.points_earned_follow_inacc += rew;
+                            } else {
+                                summary_data.points_earned_unfollow_inaccurate_training += rew;
+                                window.cycle_stats.points_earned_unfollow_inacc += rew;
                             }
                         }
                         showFloatingPoints(rew, side, btnId);
@@ -863,6 +863,9 @@
                 data.cycle_unfollow_hint = window.cycle_stats.unfollow;
                 data.cycle_earned_points = window.cycle_stats.points_earned;
                 data.cycle_earned_points_follow_accurate = window.cycle_stats.points_earned_follow_acc;
+                data.cycle_earned_points_unfollow_accurate = window.cycle_stats.points_earned_unfollow_acc; 
+                data.cycle_earned_points_follow_inaccurate = window.cycle_stats.points_earned_follow_inacc; 
+                data.cycle_earned_points_unfollow_inaccurate = window.cycle_stats.points_earned_unfollow_inacc;
             } else if (current_phase === 'test') {
                 data.cycle_follow_accurate = window.cycle_stats.follow_acc;
                 data.cycle_unfollow_accurate = window.cycle_stats.unfollow_acc;
@@ -1139,19 +1142,6 @@
               unfollow_accurate_test: typeof summary_data !== 'undefined' ? summary_data.unfollow_accurate_test : 0,
               follow_inaccurate_test: typeof summary_data !== 'undefined' ? summary_data.follow_inaccurate_test : 0,
               unfollow_inaccurate_test: typeof summary_data !== 'undefined' ? summary_data.unfollow_inaccurate_test : 0,
-              
-              caseA_total_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_total_clicks : 0,
-              caseA_follow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_follow_accurate_clicks : 0,
-              caseA_unfollow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_unfollow_accurate_clicks : 0,
-              caseA_follow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_follow_inaccurate_clicks : 0,
-              caseA_unfollow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseA_unfollow_inaccurate_clicks : 0,
-              
-              caseB_total_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_total_clicks : 0,
-              caseB_follow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_follow_accurate_clicks : 0,
-              caseB_unfollow_accurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_unfollow_accurate_clicks : 0,
-              caseB_follow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_follow_inaccurate_clicks : 0,
-              caseB_unfollow_inaccurate_clicks: typeof summary_data !== 'undefined' ? summary_data.caseB_unfollow_inaccurate_clicks : 0,
-
               training_duration_sec: train_time,
               test_duration_sec: test_time,
               total_experiment_sec: total_time,
@@ -1168,7 +1158,7 @@
               points_earned_follow_inaccurate_test: typeof summary_data !== 'undefined' ? summary_data.points_earned_follow_inaccurate_test : 0,
               points_earned_unfollow_accurate_test: typeof summary_data !== 'undefined' ? summary_data.points_earned_unfollow_accurate_test : 0,
               points_earned_unfollow_inaccurate_test: typeof summary_data !== 'undefined' ? summary_data.points_earned_unfollow_inaccurate_test : 0,
-              final_money_reward: 3000, // 最終獲得金額は必ず3000枚
+              final_money_reward: 750, // 最終獲得金額は必ず750枚
               eval_inaccurate: experiment_data.eval_inaccurate ||
               '未回答',
               eval_accurate: experiment_data.eval_accurate ||
