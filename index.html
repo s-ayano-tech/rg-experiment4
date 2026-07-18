@@ -698,7 +698,7 @@
                 let d = window.current_trial_data;
                 let is_switch = (last_side !== null && last_side !== side);
                 last_side = side;
-
+                let actual_reward = 0;
                 if(is_switch) {
                     is_cod = true;
                     playAudio('switch');
@@ -717,8 +717,8 @@
                         rew = (side === d.red_dir) ? d.red_val : d.blue_val;
                     }
 
-                    // 【変更後】
                     if (now >= next_reward_time && rew > 0) {
+                        actual_reward = rew;
                         let imgId = side === 0 ? 'img-L' : 'img-R';
                         let btnId = side === 0 ? 'btn-L' : 'btn-R';
     
@@ -808,7 +808,7 @@
                         character: d.char,
                         hint_side: hint_side === 0 ? 'left' : 'right',
                         followed_hint: is_follow, 
-                        reward_val: typeof rew !== 'undefined' ? rew : 0, // 利益版は獲得した金額
+                        reward_val: actual_reward,
                         cod: is_switch, rt: now - window.choice_start_time 
                     });
                 } else if (current_phase === 'test') {
@@ -841,7 +841,7 @@
                         red_hint_side: d.red_dir === 0 ? 'left' : 'right', 
                         blue_hint_side: d.blue_dir === 0 ? 'left' : 'right',
                         red_val: d.red_val, blue_val: d.blue_val,
-                        reward_val: typeof rew !== 'undefined' ? rew : 0, // 利益版は獲得した金額
+                        reward_val: actual_reward,
                         cod: is_switch, rt: now - window.choice_start_time 
                     });
                 }
